@@ -7,6 +7,8 @@ import org.springframework.core.io.buffer.DataBufferUtils
 import org.springframework.core.io.buffer.DefaultDataBufferFactory
 import org.springframework.stereotype.Component
 import reactor.core.publisher.Flux
+import java.io.FileInputStream
+import java.io.FileOutputStream
 import java.nio.channels.AsynchronousFileChannel
 import java.nio.channels.CompletionHandler
 import java.nio.file.Files
@@ -45,11 +47,26 @@ class KotlindemoRunner : CommandLineRunner {
         val pathToFileDest = pathToFileSrc.split(".")[0] + "_" + UUID.randomUUID().toString() + "." + pathToFileSrc.split(".")[1]
         val pathSrc = Paths.get(pathToFileSrc)
         val pathDest = Paths.get(pathToFileDest)
-        //generateFile(start, pathDest)
-        //copyFileReactive(pathSrc, pathDest, sizeBuffer, start)
-        copyFileImperative(pathSrc, pathDest, sizeBuffer, start)
+        //generateFile(start, pathDest) 4 sec
+        //copyFileReactive(pathSrc, pathDest, sizeBuffer, start) 2 sec
+        //copyFileImperative(pathSrc, pathDest, sizeBuffer, start) < 1 sec
+        //nioCopy(pathSrc, pathDest, sizeBuffer, start) 3 sec
         //Files.deleteIfExists(pathDest)
         System.exit(0)
+    }
+
+    fun nioCopy(pathSrc: Path, pathDest: Path, sizeBuffer: Int, start: Date) {
+        nioCopy(pathSrc, pathDest, sizeBuffer)
+        val end = Date()
+        println("Application Ended @ $end")
+        val diff = end.time.minus(start.time)
+        val copiedBufferSize = writtenSize
+        if (writtenSize == 0)
+            println("$diff milli secondi")
+        else {
+            val copyRate = writtenSize.div(1024).div(1024).div(diff)
+            println("Copiati $copiedBufferSize byte In $diff milli secondi, rate $copyRate MB/s")
+        }
     }
 
     fun generateFile(start: Date, pathDest: Path) {
@@ -64,6 +81,19 @@ class KotlindemoRunner : CommandLineRunner {
             val copyRate = writtenSize.div(1024).div(1024).div(diff)
             println("Copiati $copiedBufferSize byte In $diff milli secondi, rate $copyRate MB/s")
         }
+    }
+
+    fun nioCopy(pathSrc: Path, pathDest: Path, sizeBuffer: Int) {
+
+        val inputStream = FileInputStream(pathSrc.toFile())
+        val inChannel = inputStream.channel
+
+        val outputStream = FileOutputStream(pathDest.toFile())
+        val outChannel = outputStream.channel
+
+        inChannel.transferTo(0, pathSrc.toFile().length(), outChannel)
+        inputStream.close()
+        outputStream.close()
     }
 
     fun copyFileReactive(pathSrc: Path, pathDest: Path, sizeBuffer: Int, start: Date) {
